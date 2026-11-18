@@ -1,0 +1,133 @@
+/*
+ * Felles tiltaksbibliotek. Versjoneres på GitHub.
+ * Regel: et tall står bare her hvis det har en kilde vi har lest. Ellers er det null («mangler»),
+ * og kommunen legger inn eget tall med kilde og årstall.
+ */
+(function (root) {
+  'use strict';
+  var MDIR_M1084 = 'Miljødirektoratet, Metodikk for tiltaksanalyser (M-1084)';
+  var KIN26 = 'Miljødirektoratet, Klimatiltak i Norge 2026, tiltaksark';
+
+  var bibliotek = {
+    versjon: '0.1.0',
+    dato: '2026-11-18',
+
+    // Felles parametre. Kan overstyres av kommunen (nivå 2) med egen kilde.
+    parametre: {
+      rente: { navn: 'Kalkulasjonsrente', enhet: '%', v: 4, kilde: MDIR_M1084 + ' og Finansdepartementets R-109', aar: 2021, kvalitet: 'A',
+        hjelp: '4 % de første 40 årene. Fra år 41 til 75 brukes ett prosentpoeng lavere, deretter to.' },
+      efStrom: { navn: 'Utslipp per kWh strøm', enhet: 'kg CO2e per kWh', v: 0, kilde: 'Miljødirektoratet: kommunestatistikken og regnemalene teller bare direkte utslipp', aar: 2026, kvalitet: 'B',
+        hjelp: 'Med 0 gir tiltak som bare sparer strøm ingen tonn, bare sparte kWh. Endre for å se følsomhet.' },
+      bioandelVei: { navn: 'Biodrivstoff i veitrafikk', enhet: 'volumprosent', v: 15, kilde: 'Miljødirektoratet, Omregning fra energivare til utslipp (andel i 2023)', aar: 2023, kvalitet: 'B',
+        hjelp: 'Andelen biodrivstoff som allerede blandes inn. Trekkes fra kuttet.' },
+      helseGange: { navn: 'Helsegevinst, gange', enhet: 'kr per personkilometer', v: 29.40, kilde: 'Helsedirektoratet (2025), gjengitt i ' + KIN26 + ' T03', aar: 2023, kvalitet: 'A',
+        hjelp: '2023-kroner.' },
+      helseSykkel: { navn: 'Helsegevinst, sykling', enhet: 'kr per personkilometer', v: 20.03, kilde: 'Helsedirektoratet (2025), gjengitt i ' + KIN26 + ' T03', aar: 2023, kvalitet: 'A',
+        hjelp: '2023-kroner.' },
+      efDiesel: { navn: 'Utslipp per liter diesel', enhet: 'kg CO2e per liter', v: null, kilde: '', hjelp: 'Mangler. Hentes fra Miljødirektoratets regnemaler eller SSB.' },
+      efFyringsolje: { navn: 'Utslipp per liter fyringsolje', enhet: 'kg CO2e per liter', v: null, kilde: '', hjelp: 'Mangler. Hentes fra Miljødirektoratets regnemal for oppvarming.' },
+      prisDiesel: { navn: 'Pris diesel', enhet: 'kr per liter', v: null, kilde: '', hjelp: 'Mangler. Bruk kommunens innkjøpsavtale.' },
+      prisAnleggsdiesel: { navn: 'Pris anleggsdiesel', enhet: 'kr per liter', v: null, kilde: '', hjelp: 'Mangler. Bruk kommunens innkjøpsavtale.' },
+      prisStrom: { navn: 'Pris strøm', enhet: 'kr per kWh', v: null, kilde: '', hjelp: 'Mangler. Bruk kommunens kraftavtale inkludert nettleie.' },
+      kostNox: { navn: 'Helsekostnad per kg NOx', enhet: 'kr per kg', v: null, kilde: '', hjelp: 'Mangler. Hentes fra Statens vegvesen V712 (ny utgave er under arbeid).' },
+      kostPm: { navn: 'Helsekostnad per kg PM', enhet: 'kr per kg', v: null, kilde: '', hjelp: 'Mangler. Hentes fra Statens vegvesen V712.' },
+      karbonpris: { navn: 'Karbonpris (sammenligningslinje)', enhet: 'kr per tonn', v: null, kilde: '', hjelp: 'Finansdepartementets anbefalte karbonprisbane for året. Vises bare som linje i figurene.' }
+    },
+
+    maler: [
+      {
+        id: 'elvarebil', navn: 'Elektriske varebiler i kommunens bilpark', modell: 'kjoretoy', sektor: 'Veitrafikk',
+        utslippskilde: 'Kommunens bilpark', omfang: 'direkte', kode: 'T15', rolle: 'Eier og drifter, innkjøper',
+        aktivitetEnhet: 'km', aktivitetEnhetEntall: 'km',
+        beskrivelse: 'Fossile varebiler i egen drift byttes til elektriske ved utskifting.',
+        husk: 'Investeringen er høyere, men drift og vedlikehold er ofte billigere. Sjekk behov for nettoppgradering ved depot.',
+        nasjonal: { tekst: '1 000–1 500 kr/tonn', lav: 1000, hoy: 1500, kilde: KIN26 + ' T15' },
+        standard: { efFossil: { ref: 'efDiesel' }, bioandel: { ref: 'bioandelVei' }, efStrom: { ref: 'efStrom' }, prisFossil: { ref: 'prisDiesel' }, prisStrom: { ref: 'prisStrom' }, kostNox: { ref: 'kostNox' }, kostPm: { ref: 'kostPm' } }
+      },
+      {
+        id: 'elpersonbil', navn: 'Elektriske tjenestebiler', modell: 'kjoretoy', sektor: 'Veitrafikk',
+        utslippskilde: 'Kommunens bilpark', omfang: 'direkte', rolle: 'Eier og drifter, innkjøper',
+        aktivitetEnhet: 'km', aktivitetEnhetEntall: 'km',
+        beskrivelse: 'Fossile personbiler i egen drift byttes til elektriske.',
+        husk: 'Vurder om bilen trengs i det hele tatt. Bilpool og el-sykkel kan gi større kutt.',
+        standard: { efFossil: { ref: 'efDiesel' }, bioandel: { ref: 'bioandelVei' }, efStrom: { ref: 'efStrom' }, prisFossil: { ref: 'prisDiesel' }, prisStrom: { ref: 'prisStrom' }, kostNox: { ref: 'kostNox' }, kostPm: { ref: 'kostPm' } }
+      },
+      {
+        id: 'anleggsmaskiner', navn: 'Utslippsfrie maskiner i kommunale byggeprosjekter', modell: 'kjoretoy', sektor: 'Annen mobil forbrenning',
+        utslippskilde: 'Bygge- og anleggsplasser', omfang: 'direkte', kode: 'T18', rolle: 'Innkjøper, myndighet',
+        aktivitetEnhet: 'timer', aktivitetEnhetEntall: 'time',
+        beskrivelse: 'Kommunen krever eller premierer elektriske maskiner i egne bygge- og anleggskontrakter.',
+        husk: 'Merkostnaden kommer som regel i kontrakten. Avklar krafttilgang og batteribank tidlig.',
+        nasjonal: { tekst: '1 000–2 500 kr/tonn', lav: 1000, hoy: 2500, kilde: KIN26 + ' T18' },
+        standard: { efFossil: { ref: 'efDiesel' }, efStrom: { ref: 'efStrom' }, prisFossil: { ref: 'prisAnleggsdiesel' }, prisStrom: { ref: 'prisStrom' }, kostNox: { ref: 'kostNox' }, kostPm: { ref: 'kostPm' } }
+      },
+      {
+        id: 'fossilvarme', navn: 'Utfasing av fossil oppvarming i kommunale bygg', modell: 'energi', sektor: 'Oppvarming',
+        utslippskilde: 'Oppvarming i kommunale bygg', omfang: 'direkte', kode: 'O03', rolle: 'Eier og drifter',
+        beskrivelse: 'Olje- eller gassfyring erstattes med varmepumpe, fjernvarme eller bioenergi.',
+        husk: 'Fyring med fossil olje er forbudt. Sjekk om gass og reservekjeler fortsatt er i bruk.',
+        standard: { efFossil: { ref: 'efFyringsolje' }, efStrom: { ref: 'efStrom' }, prisStrom: { ref: 'prisStrom' } }
+      },
+      {
+        id: 'energieffektivisering', navn: 'Energieffektivisering i kommunale bygg', modell: 'energi', sektor: 'Oppvarming',
+        utslippskilde: 'Strømbruk i kommunale bygg', omfang: 'indirekte', rolle: 'Eier og drifter',
+        beskrivelse: 'Etterisolering, vindusskifte, styring av ventilasjon og energiledelse.',
+        husk: 'Med standard strømfaktor gir tiltaket sparte kWh, ikke tonn. Det vises som eget resultat.',
+        standard: { efStrom: { ref: 'efStrom' }, prisStrom: { ref: 'prisStrom' } }
+      },
+      {
+        id: 'ledgatelys', navn: 'LED i gatelys', modell: 'energi', sektor: 'Energi',
+        utslippskilde: 'Strømbruk i gatelys', omfang: 'indirekte', rolle: 'Eier og drifter',
+        beskrivelse: 'Gatelys byttes til LED med styring.',
+        husk: 'Gir sparte kWh. Lengre levetid gir ofte lavere vedlikehold.',
+        standard: { efStrom: { ref: 'efStrom' }, prisStrom: { ref: 'prisStrom' } }
+      },
+      {
+        id: 'lavkarbonbetong20', navn: 'Lavkarbonbetong klasse 20 i formålsbygg', modell: 'materiale', sektor: 'Bygg og anlegg',
+        utslippskilde: 'Betong i bygg', omfang: 'indirekte', rolle: 'Innkjøper, byggherre', mengdeEnhet: 'm³',
+        beskrivelse: 'Alle betongkonstruksjoner over mark i klasse 20 i stedet for bransjestandard klasse 10 (EBA-veilederen tiltak 3.10).',
+        husk: 'Sjekk tilgjengelighet og leveringstid tidlig i prosessen.',
+        standard: { reduksjon: { v: 10, kilde: 'Norsk betongforening (2025) via EBA-veilederen v2.0: klasse 20 er 20 % under bransjereferansen, klasse 10 er 10 % under', aar: 2025, kvalitet: 'B' } }
+      },
+      {
+        id: 'trefremforstal', navn: 'Trekonstruksjoner fremfor stål i formålsbygg', modell: 'materiale', sektor: 'Bygg og anlegg',
+        utslippskilde: 'Bæresystem i bygg', omfang: 'indirekte', rolle: 'Byggherre', mengdeEnhet: 'tonn stål erstattet',
+        beskrivelse: 'Søyler og bjelker i tre eller limtre i stedet for stål (EBA-veilederen tiltak 3.1).',
+        husk: 'EBA vurderer tiltaket som kostnadsbesparende (+). Krever tidlig tverrfaglig prosjektering.',
+        standard: {}
+      },
+      {
+        id: 'sykkelgange', navn: 'Tilrettelegging for sykkel og gange', modell: 'aktivtransport', sektor: 'Veitrafikk',
+        utslippskilde: 'Personbiltrafikk', omfang: 'direkte', kode: 'T03', rolle: 'Samfunnsutvikler, myndighet',
+        beskrivelse: 'Sykkelveier, sykkelparkering, trygge skoleveier og lavere fartsgrenser.',
+        husk: 'Kuttet blir mindre over tid fordi bilparken blir elektrisk. Sett årlig nedgang i kuttet. Helsegevinsten er ofte mye større enn klimagevinsten.',
+        nasjonal: { tekst: 'Ikke kvantifisert, antatt lav. Helsegevinst alene ca. 2,55 mill. kr per tonn', kilde: KIN26 + ' T03' },
+        standard: { helseGange: { ref: 'helseGange' }, helseSykkel: { ref: 'helseSykkel' } }
+      },
+      {
+        id: 'matsvinn', navn: 'Redusert matsvinn i kommunale kjøkken', modell: 'innkjop', sektor: 'Jordbruk (indirekte)',
+        utslippskilde: 'Mat i kommunal drift', omfang: 'indirekte', kode: 'J02', rolle: 'Eier og drifter, innkjøper',
+        beskrivelse: 'Måling av svinn, tilpassede porsjoner og rutiner i sykehjem, skoler og barnehager.',
+        husk: 'Den største barrieren er å holde rutinene ved like over tid.',
+        nasjonal: { tekst: 'ca. −11 500 kr/tonn (besparelse)', lav: -11500, hoy: -11500, kilde: KIN26 + ' J02' },
+        standard: {}
+      },
+      {
+        id: 'kosthold', navn: 'Mer plantebasert mat i kommunale kjøkken', modell: 'innkjop', sektor: 'Jordbruk (indirekte)',
+        utslippskilde: 'Mat i kommunal drift', omfang: 'indirekte', kode: 'J01', rolle: 'Innkjøper, eier og drifter',
+        beskrivelse: 'Menyer i tråd med nasjonale kostråd, med mindre rødt kjøtt.',
+        husk: 'Før inn redusert kjøttinnkjøp som «mindre innkjøp», og kostnaden for erstatningsvarer som driftskostnad.',
+        standard: {}
+      },
+      {
+        id: 'egendefinert', navn: 'Egendefinert tiltak', modell: 'direkte', sektor: '', utslippskilde: '', omfang: 'direkte',
+        beskrivelse: 'For tiltak der kuttet er regnet ut et annet sted, for eksempel i Miljødirektoratets regnemaler.',
+        husk: 'Skriv kilden for kuttet i feltet for kilde.', standard: {}
+      }
+    ]
+  };
+
+  root.KT = root.KT || {};
+  root.KT.bibliotek = bibliotek;
+  if (typeof module !== 'undefined' && module.exports) module.exports = bibliotek;
+})(typeof window !== 'undefined' ? window : globalThis);
